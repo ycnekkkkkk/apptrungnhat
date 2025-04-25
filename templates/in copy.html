@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minigame Ô Chữ Văn Hóa</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(to right, #f9f3ec, #ffeedd);
+      color: #333;
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    #sakuraCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    body > *:not(#sakuraCanvas) {
+      position: relative;
+      z-index: 2;
+    }
+
+    h2 {
+      font-size: 35px;
+      margin-bottom: 20px;
+    }
+
+    .letter-boxes, .guess-boxes {
+      margin: 20px auto;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .letter, .guess-letter {
+      width: 50px;
+      height: 50px;
+      border: 2px solid #444;
+      border-radius: 10px;
+      background-color: white;
+      font-size: 28px;
+      font-weight: bold;
+      line-height: 50px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+
+    .letter.revealed {
+      background-color: #ffcc70;
+      color: black;
+    }
+
+    .letter.disabled {
+      cursor: default;
+      background-color: #ddd;
+      color: #aaa;
+    }
+
+    .question-box {
+      margin-top: 30px;
+      padding: 20px;
+      border: 2px dashed #ccc;
+      background-color: #fff;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      display: none;
+      border-radius: 10px;
+    }
+
+    .question {
+      font-size: 18px;
+      margin-bottom: 15px;
+    }
+
+    .answers button {
+      padding: 10px 15px;
+      margin: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: none;
+      background-color: #ffb84d;
+      color: #fff;
+      transition: 0.2s;
+    }
+
+    .answers button:hover {
+      background-color: #ffa31a;
+    }
+
+    .explanation {
+      margin-top: 30px;
+      font-style: italic;
+      color: #444;
+      font-size: 18px;
+    }
+
+    #guessInput {
+      margin-top: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #guessInput button {
+      font-size: 18px;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+    }
+
+    #minigame {
+      display: none; /* Ẩn toàn bộ minigame ngay từ đầu */
+      opacity: 0;
+      transition: opacity 1s ease;
+      z-index: 2;
+    }
+
+    #welcomeScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: transparent; /* Màu nền mờ nhẹ */
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+
+    .welcome-content {
+      text-align: center;
+      animation: fadeInUp 1s ease;
+    }
+
+    .welcome-content img {
+      max-width: 500px;
+      animation: wave 1s ease infinite alternate;
+    }
+
+    .welcome-content h1 {
+      font-size: 40px;
+      margin-top: 20px;
+      font-weight: bold;
+      color: #e87b3e;
+    }
+
+    @keyframes fadeInUp {
+      from {transform: translateY(30px);opacity: 0;}
+      to {transform: translateY(0);opacity: 1;}
+    }
+
+    @keyframes wave {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    @media (max-width: 600px) {
+      .letter, .guess-letter {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+        line-height: 35px;
+      }
+    
+      h2 {
+        font-size: 22px;
+      }
+    
+      .question {
+        font-size: 16px;
+      }
+    
+      .explanation {
+        font-size: 16px;
+      }
+    
+      #guessInput {
+        flex-direction: column;
+        gap: 15px;
+      }
+    
+      .answers button {
+        font-size: 14px;
+        padding: 10px;
+      }
+    
+      .question-box {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Màn chào Konichiwa -->
+  <div id="welcomeScreen">
+    <div class="welcome-content">
+      <img src="static/hello.gif" alt="Cậu bé chào" />
+      <audio id="konichiwaAudio" src="static/konnichiwa.mp3" autoplay muted></audio>
+      <h1>Xin chào!</h1>
+      <!-- Nếu muốn có âm thanh -->
+    </div>
+  </div>
+ <!-- Canvas hiệu ứng hoa rơi -->
+  <canvas id="sakuraCanvas"></canvas>
+
+
+  <!-- Minigame -->
+  <div id="minigame">
+    <h2>Giải Ô Chữ Văn Hóa</h2>
+    <div class="letter-boxes" id="letterBoxes"></div>
+    <div id="guessInput">
+      <div class="guess-boxes" id="guessBoxes"></div>
+      <button onclick="checkGuess()">Dự đoán</button>
+    </div>
+
+    <div class="question-box" id="questionBox">
+      <div class="question" id="questionText"></div>
+      <div class="answers" id="answersContainer"></div>
+    </div>
+    <div class="explanation" id="explanation"></div>
+    <!-- Thêm âm thanh -->
+    <audio id="correctSound" src="static/dungroi.mp3"></audio>
+    <audio id="wrongSound" src="static/sai.mp3"></audio>
+    <!--Thêm gif-->
+    <img id="gifCorrect" src="static/gifdung.gif" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; width:300px;" />
+    <img id="gifWrong" src="static/gifsai.gif" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; width:300px;" />
+  </div> 
+
+  <script>
+    const gameData = [
+      {
+        word: "PHUTANG",
+        explanation: "Phù Tang là tên gọi cổ của Nhật Bản, gắn với truyền thuyết về mặt trời mọc.",
+        questions: [
+          { 
+            question: "Đạo Shinto (Thần đạo) là tín ngưỡng bản địa có ảnh hưởng sâu rộng tại quốc gia nào?",
+            options: ["Trung Quốc", "Nhật Bản", "Hàn Quốc", "Triều Tiên"],
+            correct: 1
+          },
+          {
+            question: "Kappa – sinh vật huyền bí sống dưới nước, thường xuất hiện trong các câu chuyện răn đe trẻ em – thuộc về loại hình văn hóa nào??",
+            options: ["Tranh dân gian", "Truyền thuyết", "Phim hoạt hình", "Văn học hiện đại"],
+            correct: 1
+          },
+          {
+            question: "Lễ hội hanami là truyền thống ngắm hoa nổi tiếng nhất tại Nhật Bản. Loài cây trung tâm của lễ hội này là gì??",
+            options: ["Anh đào", "Trúc", "Dâu tằm", "Phong"],
+            correct: 0
+          },
+          {
+            question: "Biểu tượng trên quốc kỳ Nhật Bản là?",
+            options: ["Mặt trời", "Ngọn núi", "Sakura", "Biển cả"],
+            correct: 0
+          },
+          {
+            question: "Trong truyền thống Nhật Bản, loài cây nào được liên kết với việc nuôi tằm để sản xuất tơ lụa?",
+            options: ["Cây tre", "Cây dâu mặt trời", "Cây anh đào", "Cây táo"],
+            correct: 1
+          },
+          {
+            question: "Quốc gia nào phát triển nghệ thuật gấp giấy origami, được coi là một biểu tượng văn hóa của đất nước?",
+            options: ["Nhật Bản", "Trung Quốc", "Hàn Quốc", "Thái Lan"],
+            correct: 0
+          },
+          {
+            question: "Trong thần thoại Nhật Bản, thần Amaterasu, nữ thần mặt trời, có vai trò quan trọng trong việc tạo ra ánh sáng và sự sống. Tên của thần này có mối liên hệ mật thiết với hình ảnh gì?",
+            options: ["Sự sống", "Tái sinh", "Mặt trời mọc", "Bình yên"],
+            correct: 2
+          }
+        ]
+      },
+      {
+        word: "SAKURA",
+        explanation: "Sakura là loài hoa anh đào nổi tiếng, biểu tượng mùa xuân của Nhật Bản.",
+        questions: [
+          {
+            question: "Quốc gia nào có hệ thống chữ viết Kanji, được mượn từ Trung Quốc nhưng phát triển theo cách riêng?",
+            options: ["Trung Quốc", "Hàn Quốc", "Nhật Bản", "Thái Lan"],
+            correct: 2
+          },
+          {
+            question: "Trong triết lý Ngũ hành, mùa nào được liên kết với yếu tố 'Mộc', tượng trưng cho sự sinh trưởng, đổi mới và phát triển?",
+            options: ["Xuân", "Hạ", "Thu", "Đông"],
+            correct: 0
+          },
+          {
+            question: "Trong văn hóa Nhật Bản, khái niệm 'Mono no aware' đề cập đến vẻ đẹp của những thứ mong manh, dễ vỡ và qua đi của một loài hoa nổi tiếng ở nhật bản. Đây là biểu tượng của điều gì?",
+            options: ["Bất tử", "Vẻ đẹp ngắn ngủi", "Hạnh phúc lâu dài", "Thành công"],
+            correct: 1
+          },
+          {
+            question: "Tên gọi “hanami” nghĩa là gì?",
+            options: ["Lễ hội rượu", "Ngắm hoa", "Ngày truyền thống", "Cầu may"],
+            correct: 1
+          },
+          {
+            question: "Trong Phật giáo và nhiều tín ngưỡng châu Á, khái niệm luân hồi thường gắn liền với điều gì?",
+            options: ["Sự tái sinh", "Vĩnh cửu", "Nữ thần", "Tình bạn"],
+            correct: 0
+          },
+          {
+            question: "Trong quy hoạch đô thị Nhật Bản, khu vực nào được ưu tiên trồng nhiều cây hoa anh đào để phục vụ các sự kiện cộng đồng như ngắm hoa hay lễ hội văn hóa?",
+            options: ["Trường học", "Công viên", "Công ty", "Bệnh viện"],
+            correct: 1
+          }
+        ]
+      },
+      {
+      word: "SAMURAI",
+      explanation: "Đây là tầng lớp võ sĩ nổi bật trong xã hội phong kiến Nhật Bản, nổi tiếng với tinh thần danh dự và trung thành tuyệt đối.",
+      questions: [
+        {
+          question: "Ở Nhật Bản thời phong kiến, tầng lớp võ sĩ trung thành tuyệt đối với lãnh chúa được gọi là gì?",
+          options: ["Nông dân", "Thương nhân", "Võ sĩ phong kiến", "Tăng lữ"],
+          correct: 2
+        },
+        {
+          question: "Loại vũ khí đặc trưng của võ sĩ Nhật, có lưỡi cong, sắc bén, thường được rèn thủ công tỉ mỉ là gì?",
+          options: ["Dao găm", "Kiếm cong truyền thống", "Thương dài", "Cung tên tre"],
+          correct: 1
+        },
+        {
+          question: "Triết lý sống nổi bật của võ sĩ Nhật, đề cao danh dự, lòng trung thành và sự hi sinh, được gọi là gì?",
+          options: ["Zen", "Trà đạo", "Võ sĩ đạo", "Gấp giấy"],
+          correct: 2
+        },
+        {
+          question: "Trong lịch sử Nhật Bản, tầng lớp 'Võ sĩ đạo' này phát triển mạnh nhất vào thời kỳ phong kiến kéo dài hàng trăm năm. Đó là thời nào?",
+          options: ["Meiji", "Edo", "Taisho", "Heisei"],
+          correct: 1
+        },
+        {
+          question: "Hành động tự kết liễu bản thân để bảo toàn danh dự của võ sĩ Nhật được gọi là gì?",
+          options: ["Thiền định", "Gấp giấy", "Tự mổ bụng", "Cầu nguyện"],
+          correct: 2
+        },
+        {
+          question: "Bộ giáp truyền thống của võ sĩ Nhật thường được làm từ vật liệu gì?",
+          options: ["Sắt và da", "Gỗ và tre", "Lụa và vải", "Thủy tinh và đồng"],
+          correct: 0
+        },
+        {
+          question: "Sau thời kỳ cải cách Minh Trị, tầng lớp võ sĩ bị xóa bỏ để phục vụ cho mục tiêu nào của đất nước?",
+          options: ["Giảm chi tiêu quân sự", "Khôi phục văn hóa", "Hiện đại hóa quốc gia", "Bảo tồn truyền thống"],
+          correct: 2
+        }
+      ]
+    },
+    {
+      word: "TRADAO",
+      explanation: "Trà Đạo là nghệ thuật thưởng trà mang đậm tinh thần Thiền và văn hóa phương Đông.",
+      questions: [
+        {
+          question: "Loại đồ uống có nguồn gốc từ lá cây, được dùng nhiều trong các nghi lễ phương Đông là gì?",
+          options: ["Nước ép", "Trà", "Cà phê", "Sữa"],
+          correct: 1
+        },
+        {
+          question: "Loại lá nào thường được dùng để chế biến thức uống truyền thống ở châu Á?",
+          options: ["Lá sen", "Lá bạc hà", "Lá trà", "Lá ngải"],
+          correct: 2
+        },
+        {
+          question: "Tinh thần chính của nghệ thuật thưởng trà là gì?",
+          options: ["Giải trí", "Thể hiện địa vị", "Thiền định và tĩnh lặng", "Giao tiếp xã hội"],
+          correct: 2
+        },
+        {
+          question: "Màu sắc chủ đạo trong không gian trà truyền thống thường mang tính chất gì?",
+          options: ["Rực rỡ và lộng lẫy", "Đơn giản và tự nhiên", "Tối và lạnh", "Đa dạng và nổi bật"],
+          correct: 1
+        },
+        {
+          question: "Từ nào sau đây mô tả một con đường hoặc cách sống mang tính tinh thần, thường đi kèm với văn hóa phương Đông?",
+          options: ["Đạo", "Nghi lễ", "Pháp", "Hành trình"],
+          correct: 0
+        },
+        {
+          question: "Người theo lối sống tĩnh lặng, thường gắn với việc thiền và uống trà, được gọi là gì?",
+          options: ["Nhà buôn", "Thiền sư", "Kỹ sư", "Diễn viên"],
+          correct: 1
+        }
+      ]
+    },
+    {
+      word: "THUPHAP",
+      explanation: "Thư pháp là nghệ thuật viết chữ đẹp, mang đậm dấu ấn văn hóa và tinh thần phương Đông, đặc biệt là ở Trung Quốc, Nhật Bản và Hàn Quốc.",
+      questions: [
+        {
+          question: "Nghệ thuật viết chữ đẹp, thường được sử dụng trong các nghi lễ và văn hóa truyền thống, được gọi là gì?",
+          options: ["Mỹ thuật", "Thư pháp", "Vẽ tranh", "Khắc chữ"],
+          correct: 1
+        },
+        {
+          question: "Loại công cụ thường dùng để tạo nên các chữ đẹp là gì?",
+          options: ["Cây", "Bút lông", "Bút", "Sáp màu"],
+          correct: 1
+        },
+        {
+          question: "Phong cách viết chữ đẹp thường được sử dụng trong các dịp lễ hội, sự kiện đặc biệt ở đâu?",
+          options: ["Châu Âu", "Châu Á", "Châu Mỹ", "Châu Úc"],
+          correct: 1
+        },
+        {
+          question: "Trong 'nghệ thuật viết chữ đẹp', điều nào sau đây là yếu tố quan trọng để tạo ra tác phẩm đẹp?",
+          options: ["Kỹ thuật vẽ", "Độ bền mực", "Nhịp điệu và cảm xúc", "Sự sáng tạo màu sắc"],
+          correct: 2
+        },
+        {
+          question: "Người chuyên viết chữ đẹp trong 'nghệ thuật viết chữ đẹp' được gọi là gì?",
+          options: ["Họa sĩ", "Thư pháp gia", "Nhà văn", "Diễn viên"],
+          correct: 1
+        },
+        {
+          question: "'Nghệ thuật viết chữ đẹp' thường có sự kết hợp với loại hình nghệ thuật nào sau đây?",
+          options: ["Vẽ tranh", "Nghệ thuật múa", "Nhiếp ảnh", "Nhạc cổ điển"],
+          correct: 0
+        },
+        {   
+          question: "Nghệ thuật viết chữ đẹp, thường sử dụng bút lông và mực, có tên gọi khác là gì?",
+          options: ["Hội họa", "Điêu khắc", "Thư đạo", "Nhiếp ảnh"],
+          correct: 2
+        }
+      ]
+    },
+    {
+      word: "THOCO",
+      explanation: "Thơ cổ là thể loại văn học truyền thống với các quy tắc về niêm luật, vần điệu chặt chẽ, thường thể hiện tình cảm và quan niệm về cuộc sống.",
+      questions: [
+        {
+          question: "Thể loại văn chương nào thời xưa thường được các bậc nho sĩ dùng để bày tỏ tâm tư, tình cảm hoặc ghi lại cảnh vật?",
+          options: ["Tiểu thuyết", "Kịch", "Thơ", "Truyện ngắn"],
+          correct: 2
+        },
+        {
+          question: "Những vần điệu nào thường được sử dụng trong thơ ca truyền thống để tạo nên sự hài hòa và nhịp nhàng cho câu chữ?",
+          options: ["Vần chân", "Vần lưng", "Vần hỗn hợp", "Không vần"],
+          correct: 0
+        },
+        {
+          question: "Trong thi ca cổ điển, yếu tố nào thường được chú trọng để tạo nên vẻ đẹp hình thức và sự cân đối của bài thơ?",
+          options: ["Số lượng từ tự do", "Niêm luật", "Cách dùng từ hiện đại", "Câu văn xuôi"],
+          correct: 1
+        },
+        {
+          question: "Hình ảnh nào thường xuất hiện trong thơ ca truyền thống phương Đông, gợi tả vẻ đẹp thiên nhiên hoặc tình cảm lứa đôi?",
+          options: ["Tòa nhà cao tầng", "Xe cộ hiện đại", "Trăng, hoa, chim, gió", "Máy móc công nghiệp"],
+          correct: 2
+        },
+        {
+          question: "Thể loại thơ nào của Trung Quốc có các hình thức như ngũ ngôn, thất ngôn bát cú?",
+          options: ["Thơ tự do", "Thơ Đường luật", "Thơ Hai-ku", "Thơ lục bát"],
+          correct: 1
+        }
+      ]
+    },
+    {
+    word: "HANPHUC",
+    explanation: "Hán phục là trang phục truyền thống của người Hán, có lịch sử lâu đời và đa dạng về kiểu dáng, thể hiện văn hóa và thẩm mỹ của các triều đại Trung Hoa.",
+    questions: [
+      {
+        question: "Loại y phục nào từng được xem là biểu tượng của nền văn hóa Hán tộc qua nhiều thế kỷ?",
+        options: ["Áo dài", "Kimono", "Hán phục", "Hanbok"],
+        correct: 2
+      },
+      {
+        question: "Chất liệu vải nào thường được ưu tiên sử dụng để may các loại trang phục truyền thống знатных quý tộc thời xưa ở Trung Quốc?",
+        options: ["Cotton", "Lụa", "Lanh", "Polyester"],
+        correct: 1
+      },
+      {
+        question: "Màu sắc nào thường được xem là biểu tượng của sự quyền quý và may mắn trong trang phục truyền thống Trung Hoa?",
+        options: ["Xanh lá cây", "Trắng", "Đỏ", "Đen"],
+        correct: 2
+      },
+      {
+        question: "Kiểu dáng áo nào trong trang phục truyền thống Hán thường có phần tay rộng và dài?",
+        options: ["Áo vest", "Áo sơ mi", "Ru quần áo", "Áo khoác"],
+        correct: 2
+      },
+      {
+        question: "Phụ kiện nào thường được sử dụng để cố định tóc và trang trí trên trang phục truyền thống của phụ nữ Hán?",
+        options: ["Mũ bảo hiểm", "Khăn quàng cổ", "Trâm cài tóc", "Găng tay"],
+        correct: 2
+      },
+      {
+        question: "Trong các nghi lễ cổ truyền của người Hán, trang phục thường được lựa chọn dựa trên yếu tố nào?",
+        options: ["Sở thích cá nhân", "Xu hướng thời trang", "Địa vị xã hội và tính chất sự kiện", "Giá trị kinh tế"],
+        correct: 2
+      },
+      {
+        question: "Loại thắt lưng nào thường được dùng để hoàn thiện bộ trang phục truyền thống của nam giới người Hán?",
+        options: ["Dây nịt", "Đai da", "Ngọc đới", "Khăn lụa"],
+        correct: 2
+      }
+    ]
+    },  
+    {
+    word: "KIMONO",
+    explanation: "Kimono là trang phục truyền thống của Nhật Bản, nổi bật với kiểu dáng chữ T, tay áo rộng và được cố định bằng đai obi, thường mặc trong các dịp lễ quan trọng.",
+    questions: [
+      {
+        question: "Trang phục truyền thống nào của Nhật Bản có kiểu dáng chữ T và tay áo rộng đặc trưng?",
+        options: ["Hanbok", "Áo dài", "Kimono", "Yukata"],
+        correct: 2
+      },
+      {
+        question: "Chiếc đai lưng rộng nào được sử dụng để cố định bộ trang phục truyền thống của Nhật Bản?",
+        options: ["Thắt lưng", "Corse", "Obi", "Sarashi"],
+        correct: 2
+      },
+      {
+        question: "Chất liệu vải nào thường được dùng để may trang phục truyền thống знатных quý tộc và trong các dịp trang trọng ở Nhật Bản?",
+        options: ["Vải bố", "Vải kaki", "Lụa", "Vải thô"],
+        correct: 2
+      },
+      {
+        question: "Họa tiết nào thường xuất hiện trên trang phục truyền thống của Nhật Bản, mang ý nghĩa về may mắn, trường thọ hoặc vẻ đẹp thiên nhiên?",
+        options: ["Hình học trừu tượng", "Chân dung người nổi tiếng", "Hoa anh đào, chim hạc, sóng biển", "Logo thương hiệu"],
+        correct: 2
+      },
+      {
+        question: "Loại dép truyền thống nào thường được mang cùng với trang phục truyền thống của Nhật Bản?",
+        options: ["Giày thể thao", "Sandal", "Geta, Zori", "Ủng"],
+        correct: 2
+      },
+      {
+        question: "Trong văn hóa Nhật Bản, dịp nào thường thấy mọi người mặc trang phục truyền thống một cách trang trọng nhất?",
+        options: ["Đi dã ngoại", "Xem phim", "Lễ trưởng thành, đám cưới", "Đi siêu thị"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "COTUONG",
+    explanation: "Cờ tướng là một trò chơi trí tuệ truyền thống ở phương Đông, đặc biệt phổ biến ở Trung Quốc và Việt Nam, được xem như một hình thức chiến tranh thu nhỏ trên bàn cờ.",
+    questions: [
+      {
+        question: "Trò chơi trí tuệ nào có bàn cờ kẻ ô vuông và các quân cờ hình tròn hoặc đa giác, tượng trưng cho quân đội của hai bên?",
+        options: ["Cờ vua", "Cờ vây", "Cờ tướng", "Cờ caro"],
+        correct: 2
+      },
+      {
+        question: "Quân cờ nào trong trò chơi trí tuệ phương Đông di chuyển theo đường chéo và có vai trò bảo vệ quân 'Tướng'?",
+        options: ["Xe", "Mã", "Tượng", "Pháo"],
+        correct: 2
+      },
+      {
+        question: "Quân cờ nào trong trò chơi này có khả năng di chuyển ngang hoặc dọc trên bàn cờ?",
+        options: ["Sĩ", "Tốt", "Xe", "Mã"],
+        correct: 2
+      },
+      {
+        question: "Mục tiêu cuối cùng của người chơi trong trò chơi trí tuệ này là gì?",
+        options: ["Ăn hết quân đối phương", "Chiếm được nhiều ô trên bàn cờ nhất", "Chiếu hết quân 'Tướng' của đối phương", "Đưa quân về vị trí ban đầu"],
+        correct: 2
+      },
+      {
+        question: "Trò chơi nào được xem là một hình thức rèn luyện tư duy chiến lược và khả năng phán đoán ở phương Đông?",
+        options: ["Đá cầu", "Ô ăn quan", "Cờ tướng", "Nhảy dây"],
+        correct: 2
+      },
+      {
+        question: "Bàn cờ của trò chơi trí tuệ này có bao nhiêu đường ngang và bao nhiêu đường dọc?",
+        options: ["8 ngang, 8 dọc", "10 ngang, 9 dọc", "9 ngang, 10 dọc", "7 ngang, 7 dọc"],
+        correct: 1
+      },
+      {
+      question: "Trong khai cuộc của trò chơi này, người chơi thường có những chiến thuật nào để kiểm soát trung tâm bàn cờ?",
+      options: ["Đi quân Tốt trước", "Đi quân Mã trước", "Đi quân Xe trước", "Đi quân Pháo trước"],
+      correct: 1
+    }
+    ]
+  },
+  {
+    word: "ANIME",
+    explanation: "Anime là phong cách hoạt hình đặc trưng của Nhật Bản, thường có nhân vật với đôi mắt to, biểu cảm đa dạng và cốt truyện phong phú, đa dạng thể loại.",
+    questions: [
+      {
+        question: "Loại hình giải trí nào của Nhật Bản có các nhân vật được vẽ theo phong cách đặc trưng với đôi mắt to và thường được chuyển thể thành phim hoạt hình?",
+        options: ["Manga", "Drama", "Anime", "J-Pop"],
+        correct: 2
+      },
+      {
+        question: "Hình thức kể chuyện bằng hình ảnh động nào của Nhật Bản đã trở thành một hiện tượng văn hóa toàn cầu, thu hút đông đảo người hâm mộ?",
+        options: ["Phim tài liệu", "Phim khoa học", "Anime", "Phim nghệ thuật"],
+        correct: 2
+      },
+      {
+        question: "Yếu tố nào thường được chú trọng trong quá trình sản xuất hoạt hình Nhật Bản để tạo nên sự sống động và hấp dẫn cho câu chuyện?",
+        options: ["Diễn xuất của diễn viên", "Kỹ xảo điện ảnh thực tế", "Âm nhạc và hiệu ứng đặc biệt", "Bối cảnh tĩnh tại"],
+        correct: 2
+      },
+      {
+        question: "Studio nào được biết đến với những bộ phim hoạt hình Nhật Bản có cốt truyện sâu sắc và hình ảnh tuyệt đẹp, gây tiếng vang trên toàn thế giới?",
+        options: ["Disney", "Pixar", "Studio Ghibli", "DreamWorks"],
+        correct: 2
+      },
+      {
+        question: "Thể loại nào thường xuất hiện trong hoạt hình Nhật Bản, từ những câu chuyện đời thường đến những cuộc phiêu lưu kỳ ảo?",
+        options: ["Chỉ hài kịch", "Chỉ kinh dị", "Đa dạng thể loại", "Chỉ trinh thám"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "KICH",
+    explanation: "Kinh kịch là một loại hình nghệ thuật sân khấu truyền thống của Trung Quốc, kết hợp ca hát, vũ đạo, thoại và hóa trang đặc biệt, đặc biệt là khuôn mặt vẽ.",
+    questions: [
+      {
+        question: "Loại hình nghệ thuật sân khấu truyền thống nào của Trung Quốc nổi tiếng với hóa trang mặt phức tạp và những động tác biểu diễn mang tính tượng trưng cao?",
+        options: ["Tuồng", "Chèo", "Kinh kịch", "Cải lương"],
+        correct: 2
+      },
+      {
+        question: "Yếu tố nào là đặc trưng nổi bật trong hóa trang của các nhân vật Kinh kịch, giúp khán giả nhận diện tính cách và vai trò của họ?",
+        options: ["Mặt nạ giấy", "Tóc giả", "Khuôn mặt vẽ", "Quần áo sặc sỡ"],
+        correct: 2
+      }, 
+      {
+        question: "Loại nhạc cụ nào thường được sử dụng trong các buổi biểu diễn kịch truyền thống của Trung Quốc để tạo không khí và nhấn mạnh các tình tiết của câu chuyện?",
+        options: ["Đàn piano", "Guitar", "Trống, sáo, nhị", "Violin"],
+        correct: 2
+      },
+      {
+        question: "Các động tác tay và chân của diễn viên trong loại hình kịch truyền thống của Trung Quốc thường mang tính chất gì?",
+        options: ["Tự nhiên như đời thường", "Ngẫu hứng", "Ước lệ và tượng trưng", "Mạnh mẽ và dứt khoát"],
+        correct: 2
+      },
+    ]
+  },
+  {
+    word: "BONSAI",
+    explanation: "Bonsai là nghệ thuật trồng cây cảnh trong chậu cạn của Nhật Bản, tạo ra những cây thu nhỏ nhưng vẫn giữ được dáng vẻ tự nhiên của cây cổ thụ.",
+    questions: [
+      {
+        question: "Nghệ thuật trồng cây cảnh thu nhỏ trong chậu có nguồn gốc từ quốc gia nào?",
+        options: ["Trung Quốc", "Hàn Quốc", "Nhật Bản", "Việt Nam"],
+        correct: 2
+      },
+      {
+        question: "Mục đích chính của việc tạo hình cây cảnh trong chậu là gì?",
+        options: ["Để cây phát triển nhanh hơn", "Để cây ra nhiều quả hơn", "Tạo vẻ đẹp tự nhiên của cây cổ thụ", "Tiết kiệm diện tích trồng cây"],
+        correct: 2
+      },
+      {
+        question: "Loại chậu nào thường được sử dụng trong nghệ thuật trồng cây cảnh thu nhỏ?",
+        options: ["Chậu nhựa", "Chậu sứ cạn", "Chậu thủy tinh", "Chậu gỗ lớn"],
+        correct: 1
+      },
+      {
+        question: "Kỹ thuật nào được sử dụng để tạo dáng và duy trì kích thước nhỏ gọn cho cây cảnh trong chậu?",
+        options: ["Bón phân thường xuyên", "Tưới nước nhiều", "Cắt tỉa và uốn cành", "Để cây phát triển tự do"],
+        correct: 2
+      },
+      {
+        question: "Yếu tố nào được coi trọng trong việc đánh giá một tác phẩm cây cảnh thu nhỏ đẹp?",
+        options: ["Kích thước lớn của cây", "Màu sắc sặc sỡ của lá", "Sự cân đối và hài hòa giữa cây và chậu", "Giá trị kinh tế cao"],
+        correct: 2
+      },
+      {
+        question: "Thời gian nào trong năm thường được coi là quan trọng để thực hiện việc cắt tỉa và tạo dáng chính cho cây cảnh thu nhỏ?",
+        options: ["Mùa hè", "Mùa đông", "Đầu mùa xuân", "Cuối mùa thu"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "AODAI",
+    explanation: "Áo dài là trang phục truyền thống của Việt Nam, có thiết kế ôm sát cơ thể, xẻ tà hai bên hông và thường được mặc trong các dịp lễ quan trọng hoặc trang phục công sở.",
+    questions: [
+    {
+        question: "Loại quần nào thường được mặc cùng với trang phục truyền thống của phụ nữ Việt Nam?",
+        options: ["Quần jean", "Quần tây", "Quần lụa ống rộng", "Quần short"],
+        correct: 2
+      },
+      {
+        question: "Chất liệu vải nào thường được ưu tiên sử dụng để may trang phục truyền thống của Việt Nam, mang lại vẻ mềm mại và duyên dáng?",
+        options: ["Vải kaki", "Vải bố", "Vải lụa", "Vải cotton dày"],
+        correct: 2
+      },
+      {
+        question: "Trong văn hóa Việt Nam, trang phục truyền thống thường được mặc trong những dịp nào?",
+        options: ["Đi chơi thể thao", "Làm việc nhà", "Lễ Tết, cưới hỏi, hội nghị", "Đi ngủ"],
+        correct: 2
+      },
+      {
+        question: "Phần cổ áo của trang phục truyền thống Việt Nam thường có kiểu dáng như thế nào?",
+        options: ["Cổ tròn", "Cổ chữ V", "Cổ cao đứng", "Cổ bẻ"],
+        correct: 2
+      },
+      {
+        question: "Trang phục truyền thống nào của Việt Nam có thiết kế ôm sát cơ thể và xẻ tà hai bên hông?",
+        options: ["Kimono", "Hanbok", "Áo dài", "Barong Tagalog"],
+        correct: 2
+      },
+    ]
+  },
+  {
+    word: "DOSU",
+    explanation: "Đất nước đồ sứ là một trong những tên gọi của Trung Quốc, xuất phát từ lịch sử lâu đời và sự phát triển rực rỡ của ngành gốm sứ tại quốc gia này.",
+    questions: [
+      {
+        question: "Quốc gia nào được biết đến với lịch sử hàng ngàn năm trong việc sản xuất các sản phẩm gốm sứ tinh xảo?",
+        options: ["Nhật Bản", "Hàn Quốc", "Trung Quốc", "Thái Lan"],
+        correct: 2
+      },
+      {
+        question: "Phát minh quan trọng nào trong lĩnh vực chế tác đã mang lại danh tiếng 'đồ sứ' cho một quốc gia ở Đông Á?",
+        options: ["Kính viễn vọng", "Thuốc súng", "Gốm sứ", "Giấy"],
+        correct: 2
+      },
+      {
+        question: "Loại hình sản phẩm nào của Trung Quốc đã trở thành một mặt hàng xuất khẩu quan trọng và được ngưỡng mộ trên toàn thế giới từ thời cổ đại?",
+        options: ["Tơ lụa", "Trà", "Đồ sứ", "Gia vị"],
+        correct: 2
+      },
+      {
+        question: "Nghệ thuật chế tác nào của Trung Quốc thường thể hiện sự tinh tế qua các họa tiết trang trí trên bình, chén và các đồ dùng khác?",
+        options: ["Khắc gỗ", "Thêu dệt", "Làm đồ sứ", "Đúc đồng"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "THAN",
+    explanation: "Đất nước của những vị thần là một trong những tên gọi của Nhật Bản, xuất phát từ tín ngưỡng Shinto bản địa với niềm tin vào vô số vị thần (kami) tồn tại trong tự nhiên.",
+    questions: [
+      {
+        question: "Quốc gia nào có tín ngưỡng bản địa tin rằng có vô số linh hồn và vị thần tồn tại trong cây cối, đá và các yếu tố tự nhiên?",
+        options: ["Trung Quốc", "Hàn Quốc", "Nhật Bản", "Việt Nam"],
+        correct: 2
+      },
+      {
+        question: "Tên gọi nào thường được dùng để chỉ một quốc gia mà trong văn hóa truyền thống, người dân tôn kính các 'vị thần' (kami)?",
+        options: ["Đất nước chùa vàng", "Đất nước Phật giáo", "Đất nước của những vị thần", "Đất nước thảo nguyên"],
+        correct: 2
+      },
+      {
+        question: "Tín ngưỡng nào của Nhật Bản có vai trò quan trọng trong việc hình thành nên tên gọi 'Đất nước của những vị thần'?",
+        options: ["Phật giáo", "Khổng giáo", "Shinto", "Đạo giáo"],
+        correct: 2
+      },
+      {
+        question: "Trong văn hóa của 'Đất nước của những vị thần', các địa điểm tự nhiên như núi, sông, và cây cổ thụ thường được coi là nơi cư ngụ của những gì?",
+        options: ["Quái vật", "Kho báu", "Thần linh", "Người ngoài hành tinh"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "TRUNGHOA",
+    explanation: "Trung Hoa là một tên gọi mang tính văn hóa và lịch sử, thường được dùng để chỉ nền văn minh lâu đời và rực rỡ của quốc gia Trung Quốc.",
+    questions: [
+      {
+        question: "Tên gọi nào thường được dùng để chỉ nền văn minh cổ đại và rực rỡ đã từng tồn tại ở khu vực Đông Á?",
+        options: ["Đại Hàn", "Nhật Bản", "Trung Hoa", "Đông Dương"],
+        correct: 2
+      },
+      {
+        question: "Khái niệm nào thường được liên kết với sự phát triển lâu đời của văn hóa, triết học và nghệ thuật tại khu vực Đông Á?",
+        options: ["Đại Mạc", "Vạn Lý Trường Thành", "Trung Hoa", "Đảo quốc"],
+        correct: 2
+      },
+      {
+        question: "Tên gọi nào gợi nhớ đến một vùng đất có lịch sử phong phú với nhiều triều đại và phát minh quan trọng?",
+        options: ["Phương Tây", "Nam Mỹ", "Trung Hoa", "Bắc Âu"],
+        correct: 2
+      },
+      {
+        question: "Tên gọi nào thường được sử dụng khi nói về di sản văn hóa đồ sộ bao gồm thư pháp, hội họa, và kiến trúc cổ kính ở Đông Á?",
+        options: ["Ấn Độ", "Ai Cập", "Trung Hoa", "Hy Lạp"],
+        correct: 2
+      },
+      {
+        question: "Dòng sông nào được coi là cái nôi của nền văn minh Trung Hoa?",
+        options: ["Sông Mekong", "Sông Hằng", "Sông Hoàng Hà", "Sông Nile"],
+        correct: 2
+      },
+      {
+        question: "Hệ thống chữ viết nào đã được phát triển và sử dụng rộng rãi trong nền văn hóa Trung Hoa cổ đại?",
+        options: ["Chữ Latinh", "Chữ Kirin", "Chữ Hán", "Chữ Khmer"],
+        correct: 2
+      },
+      {
+        question: "Một trong những công trình vĩ đại nào sau đây là biểu tượng của sự kiên trì và sức mạnh của nền văn minh Trung Hoa?",
+        options: ["Kim tự tháp Giza", "Đấu trường La Mã", "Vạn Lý Trường Thành", "Angkor Wat"],
+        correct: 2
+      },
+      {
+        question: "Triết lý nào có ảnh hưởng sâu sắc đến đời sống văn hóa và chính trị của Trung Hoa trong hàng ngàn năm?",
+        options: ["Chủ nghĩa khắc kỷ", "Chủ nghĩa tự do", "Nho giáo", "Chủ nghĩa hiện sinh"],
+        correct: 2
+      }
+    ]
+  },
+  {
+    word: "THIENTRIEU",
+    explanation: "Thiên triều là một tên gọi cổ xưa của Trung Quốc, thể hiện quan niệm về vị thế trung tâm và sự ảnh hưởng văn hóa của quốc gia này trong khu vực.",
+    questions: [
+      {
+        question: "Trong lịch sử Đông Á, quốc gia nào từng được các nước xung quanh triều cống và xem là trung tâm văn hóa?",
+        options: ["Triều Tiên", "Nhật Bản", "Trung Quốc", "Việt Nam"],
+        correct: 2
+      },
+      {
+        question: "Quan niệm 'Thiên mệnh' thường gắn liền với tên gọi 'Thiên triều', ý chỉ điều gì?",
+        options: ["Sự giàu có về tài nguyên", "Quyền cai trị được trời ban", "Vị trí địa lý thuận lợi", "Sức mạnh quân sự tuyệt đối"],
+        correct: 1
+      },
+      {
+        question: "Hệ thống chính trị nào thường tồn tại ở các quốc gia được gọi là 'Thiên triều' trong lịch sử?",
+        options: ["Cộng hòa dân chủ", "Quân chủ lập hiến", "Quân chủ chuyên chế", "Xã hội chủ nghĩa"],
+        correct: 2
+      },
+      {
+        question: "Các quốc gia láng giềng thường thể hiện sự thần phục 'Thiên triều' qua hình thức nào?",
+        options: ["Trao đổi hàng hóa ngang bằng", "Liên minh quân sự", "Cống nạp và triều kiến", "Hợp tác kinh tế"],
+        correct: 2
+      },
+      {
+        question: "Yếu tố nào đóng vai trò quan trọng trong việc duy trì vị thế 'Thiên triều' của một quốc gia?",
+        options: ["Sự cô lập về văn hóa", "Sức mạnh quân sự và ảnh hưởng văn hóa", "Địa hình hiểm trở", "Nguồn tài nguyên thiên nhiên hạn chế"],
+        correct: 1
+      },
+      {
+        question: "Trong lịch sử, sự sụp đổ của một 'Thiên triều' thường bắt nguồn từ những nguyên nhân nào?",
+        options: ["Sự trỗi dậy của các nền văn minh khác", "Khí hậu thay đổi đột ngột", "Sự ổn định chính trị tuyệt đối", "Nguồn tài nguyên dồi dào"],
+        correct: 0
+      },
+      {
+        question: "Tên gọi 'Thiên triều' hàm ý về một trật tự thế giới mà quốc gia đó giữ vai trò gì?",
+        options: ["Một thành viên bình đẳng", "Một đối tác kinh tế", "Trung tâm và có quyền lực tối cao", "Một quốc gia nhỏ bé và phụ thuộc"],
+        correct: 2
+      },
+      {
+        question: "Ảnh hưởng của tư tưởng 'Thiên triều' còn được nhìn thấy trong những khía cạnh nào của văn hóa truyền thống?",
+        options: ["Ẩm thực đường phố", "Trang phục hàng ngày", "Nghệ thuật cung đình và nghi lễ", "Các trò chơi dân gian"],
+        correct: 2
+      },
+      {
+        question: "Sự thay đổi trong bối cảnh quốc tế đã dẫn đến sự suy giảm của quan niệm 'Thiên triều' như thế nào?",
+        options: ["Sự trỗi dậy của các cường quốc phương Tây", "Sự phát triển của khoa học công nghệ", "Sự giao lưu văn hóa rộng rãi", "Tất cả các yếu tố trên"],
+        correct: 3
+      },
+      {
+        question: "Tên gọi nào trong lịch sử thường được dùng để chỉ một quốc gia tự xem mình là trung tâm văn minh và có ảnh hưởng lớn đến các nước láng giềng?",
+        options: ["Đế quốc La Mã", "Đế quốc Anh", "Thiên triều", "Đế quốc Mông Cổ"],
+        correct: 2
+      },
+    ]
+  }, 
+  {
+    word: "KABUKI",
+    explanation: "Kabuki là một loại hình kịch nghệ truyền thống của Nhật Bản, nổi tiếng với trang phục lộng lẫy, hóa trang đặc biệt và những động tác điệu bộ cách điệu.",
+    questions: [
+      {
+        question: "Loại hình kịch nghệ truyền thống nào của Nhật Bản nổi tiếng với trang phục rực rỡ và hóa trang ấn tượng?",
+        options: ["Noh", "Bunraku", "Kabuki", "Kyogen"],
+        correct: 2
+      },
+      {
+        question: "Đặc điểm nổi bật nào trong hóa trang của diễn viên kịch nghệ này giúp khán giả nhận diện vai trò và tính cách nhân vật?",
+        options: ["Mặt nạ gỗ", "Vẽ mặt cầu kỳ", "Tóc giả đơn giản", "Quần áo tối màu"],
+        correct: 1
+      },
+      {
+        question: "Trong kịch nghệ truyền thống này, các động tác của diễn viên thường mang tính chất gì?",
+        options: ["Tự nhiên như đời sống", "Ngẫu hứng", "Cách điệu và tượng trưng", "Nhanh và mạnh mẽ"],
+        correct: 2
+      },
+      {
+        question: "Ai là người thường đảm nhận tất cả các vai diễn, kể cả vai nữ (oyama) trong kịch nghệ truyền thống này?",
+        options: ["Nữ diễn viên", "Diễn viên trẻ em", "Nam diễn viên", "Người già"],
+        correct: 2
+      },
+      {
+        question: "Sân khấu của loại hình kịch nghệ này thường có đặc điểm gì nổi bật?",
+        options: ["Sân khấu tròn", "Sân khấu không декорации", "Sân khấu có đường đi phụ (hanamichi)", "Sân khấu ngoài trời"],
+        correct: 2
+      },
+      {
+        question: "Yếu tố nào trong buổi biểu diễn kịch nghệ này thường được sử dụng để tạo hiệu ứng đặc biệt và nhấn mạnh các tình tiết quan trọng?",
+        options: ["Ánh sáng tự nhiên", "Tiếng động hàng ngày", "Âm nhạc truyền thống và tiếng trống", "Sự im lặng tuyệt đối"],
+        correct: 2
+      }
+    ]
+  },
+  {
+  word: "HOANGDE",
+  explanation: "Hoàng Đế là người lãnh đạo tối cao trong hệ thống chính trị cổ đại, được coi là 'con của trời'.",
+  questions: [
+    {
+      question: "Theo nghĩa Hán Việt, con của trời được dịch như thế nào?",
+      options: ["Thiên tử", "Thiên đạo", "Thiên tuế", "Thiên tài"],
+      correct: 0
+    },
+    {
+      question: "Cách xưng hô nào sau đây là thuần cổ đại?",
+      options: ["Trẫm", "Tớ", "Mình", "Tôi"],
+      correct: 0
+    },
+    {
+      question: "Con vật nào sau đây là biểu tượng của quyền lực thời Trung Quốc cổ đại?",
+      options: ["Rồng", "Phượng hoàng", "Bồ câu", "Rắn"],
+      correct: 0
+    },
+    {
+      question: "Bisa trong tiếng Trung nghĩa là gì?",
+      options: ["Bệ hạ", "Hoàng hậu", "Công chúa", "Hoàng tử"],
+      correct: 0
+    },
+    {
+      question: "Nơi có rất nhiều cung tần mỹ nữ sinh sống gọi là gì?",
+      options: ["Hậu cung", "Cung đấu", "Cung biến", "Cung tên"],
+      correct: 0
+    },
+    {
+      question: "Đâu là trang phục cổ đại?",
+      options: ["Long bào", "Áo T-Shirt", "Quần jeans", "Áo sơ mi"],
+      correct: 0
+    },
+    {
+      question: "Trong thời cổ đại Trung Quốc, thứ mà mỗi đất nước chỉ được phép có 1 cái duy nhất là gì?",
+      options: ["Ngai vàng", "Bình ngọc", "Nhẫn ngọc", "Vòng vàng"],
+      correct: 0
+    }
+  ]
+},
+{
+  word: "TAYDUKY",
+  explanation: "Tây Du Ký là một tác phẩm văn học nổi tiếng của Trung Quốc, kể về hành trình của Đường Tăng và các đồ đệ của mình tìm kiếm kinh điển.",
+  questions: [
+    {
+      question: "Thành ngữ 'Tôn sư trọng đạo' là chỉ về mối quan hệ nào?",
+      options: ["Thầy trò", "Cha mẹ", "Bạn bè", "Anh em"],
+      correct: 0
+    },
+    {
+      question: "Từ Hán Việt 'Hầu tử' là chỉ con gì?",
+      options: ["Con khỉ", "Con gà", "Con chó", "Con mèo"],
+      correct: 0
+    },
+    {
+      question: "Câu 'Nam mô A Di Đà' thuộc tôn giáo nào dưới đây?",
+      options: ["Phật giáo", "Nho giáo", "Cơ đốc giáo", "Thiên Chúa giáo"],
+      correct: 0
+    },
+    {
+      question: "Điều mà con người không muốn trải qua trong cuộc sống?",
+      options: ["Kiếp nạn", "Vận may", "Hạnh phúc", "Vui vẻ"],
+      correct: 0
+    },
+    {
+      question: "Từ Hán Việt 'Trư' là chỉ con gì?",
+      options: ["Con heo", "Con bò", "Con trâu", "Con vịt"],
+      correct: 0
+    },
+    {
+      question: "Đất nước nào trong truyền thuyết chỉ có giới tính nữ sinh sống?",
+      options: ["Nữ nhi quốc", "Nữ nhi tình", "Nữ vong quốc", "Nữ Oa"],
+      correct: 0
+    },
+    {
+      question: "Người tu hành theo Phật giáo, thường cạo đầu, mặc áo cà sa và sống trong chùa là ai?",
+      options: ["Nhà sư", "Thầy bói", "Thầy thuốc", "Thầy đồ"],
+      correct: 0
+    }
+  ]
+}
+    ];
+
+    const randomIndex = Math.floor(Math.random() * gameData.length);
+    const currentWordData = gameData[randomIndex];
+    const word = currentWordData.word;
+    const revealed = new Array(word.length).fill(false);
+    const disabled = new Array(word.length).fill(false); // lưu các ô đã bị trả lời sai
+
+    const charToQuestionIndex = [];
+    let qIndex = 0;
+
+    for (let i = 0; i < word.length; i++) {
+      if (word[i] !== " ") {
+        charToQuestionIndex[i] = qIndex++;
+      } else {
+        charToQuestionIndex[i] = null;
+      }
+    }
+
+    function renderLetters() {
+      const container = document.getElementById("letterBoxes");
+      container.innerHTML = "";
+      word.split("").forEach((ch, index) => {
+        const span = document.createElement("div");
+        span.className = "letter";
+        if (revealed[index]) {
+          span.classList.add("revealed");
+          span.innerText = ch;
+        } else if (disabled[index]) {
+          span.classList.add("disabled");
+          span.innerText = "✖";  
+        } else if (ch === " ") {
+          span.classList.add("disabled");
+          span.innerText = " ";
+        } else {
+          span.innerText = "_";
+          span.onclick = () => showQuestion(index);
+        }
+        container.appendChild(span);
+      });
+      renderGuessBoxes();
+    }
+
+    function renderGuessBoxes() {
+      const guessContainer = document.getElementById("guessBoxes");
+      guessContainer.innerHTML = "";
+      word.split("").forEach((ch, i) => {
+        if (ch === " ") {
+          const space = document.createElement("div");
+          space.style.width = "50px";
+          space.style.height = "50px";
+          space.style.margin = "5px";
+          guessContainer.appendChild(space);
+        } else {
+          const input = document.createElement("input");
+          input.className = "guess-letter";
+          input.setAttribute("maxlength", 1);
+          input.setAttribute("data-index", i);
+          input.setAttribute("type", "text");
+          input.setAttribute("autocomplete", "off");
+          input.setAttribute("inputmode", "latin");
+
+          input.addEventListener("input", (e) => {
+            if (e.target.value.length === 1) {
+              const next = e.target.nextElementSibling;
+              if (next && next.tagName === "INPUT") next.focus();
+            }
+          });
+
+          input.style.textAlign = "center";
+          input.style.textTransform = "uppercase";
+          input.style.textIndent = "0";
+          guessContainer.appendChild(input);
+        }
+      });
+    }
+
+    function showGif(id) {
+      const gif = document.getElementById(id);
+      gif.style.display = "block";
+      setTimeout(() => {
+        gif.style.display = "none";
+      }, 2000); // hiển thị trong 2 giây
+    }
+
+    function showQuestion(index) {
+      const qBox = document.getElementById("questionBox");
+      const qText = document.getElementById("questionText");
+      const aContainer = document.getElementById("answersContainer");
+
+      const questionIndex = charToQuestionIndex[index];
+      const question = currentWordData.questions[questionIndex];
+      if (!question || revealed[index]) return;
+
+      qBox.style.display = "block";
+      qText.innerText = question.question;
+      aContainer.innerHTML = "";
+
+      question.options.forEach((opt, i) => {
+        const btn = document.createElement("button");
+        btn.innerText = opt;
+        btn.onclick = () => {
+          const letterBox = document.querySelectorAll(".letter")[index];
+          if (i === question.correct) {
+            document.getElementById("correctSound").play(); // ✅ âm thanh đúng
+            showGif("gifCorrect"); // ✅ thêm dòng này
+            revealed[index] = true;
+            qBox.style.display = "none";
+            renderLetters();
+            checkCompletion();
+          } else {
+            document.getElementById("wrongSound").play(); // ❌ âm thanh sai
+            showGif("gifWrong"); // ❌ thêm dòng này
+            disabled[index] = true;
+            letterBox.classList.add("disabled");
+            letterBox.innerText = "✖";
+            letterBox.onclick = null;
+            qBox.style.display = "none";          }
+        };
+        aContainer.appendChild(btn);
+      });
+    }
+
+    function checkCompletion() {
+      const allRevealed = word.split("").every((ch, i) => ch === " " || revealed[i]);
+      if (allRevealed) {
+        alert("🎉 Chúc mừng! Bạn đã hoàn thành từ khóa: " + currentWordData.word);
+        document.getElementById("explanation").innerText = currentWordData.explanation;
+      }
+    }
+
+    function checkGuess() {
+      const guessInputs = document.querySelectorAll(".guess-letter");
+      let userGuess = "";
+
+      guessInputs.forEach(input => {
+        if (input.tagName === "INPUT") {
+          userGuess += input.value.toUpperCase();
+        } else {
+          userGuess += " ";
+        }
+      });
+
+      const cleanWord = currentWordData.word.toUpperCase().trim();
+      const cleanGuess = userGuess.toUpperCase().trim();
+      
+      if (cleanGuess === cleanWord) {
+        document.getElementById("correctSound").play(); // đoán tổng đúng
+        showGif("gifCorrect"); 
+        for (let i = 0; i < word.length; i++) {
+          if (word[i] !== " ") revealed[i] = true;
+        }
+        renderLetters();
+        checkCompletion();
+      } else {
+        document.getElementById("wrongSound").play(); // đoán tổng sai
+        showGif("gifWrong");
+        alert("Từ khóa chưa chính xác, hãy thử lại!");
+      }
+    }
+
+    // Initial render
+    renderLetters();
+  </script>
+<!-- Script hiệu ứng hoa rơi -->
+<script>
+  const canvas = document.getElementById("sakuraCanvas");
+  const ctx = canvas.getContext("2d");
+  let width = canvas.width = window.innerWidth;
+  let height = canvas.height = window.innerHeight;
+
+  const petals = [];
+  const maxPetals = 60;
+
+  function random(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function createPetal() {
+    return {
+      x: random(0, width),
+      y: random(-height, 0),
+      radius: random(4, 8),
+      speedY: random(1, 2),
+      speedX: random(-0.5, 0.5),
+      rotation: random(0, 2 * Math.PI),
+      opacity: random(0.5, 1),
+    };
+  }
+
+  for (let i = 0; i < maxPetals; i++) {
+    petals.push(createPetal());
+  }
+
+  function drawPetal(p) {
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 182, 193, ${p.opacity})`;
+    ctx.ellipse(p.x, p.y, p.radius, p.radius * 0.6, p.rotation, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, width, height);
+    for (let p of petals) {
+      drawPetal(p);
+      p.y += p.speedY;
+      p.x += p.speedX;
+      p.rotation += 0.01;
+
+      if (p.y > height || p.x < 0 || p.x > width) {
+        Object.assign(p, createPetal());
+        p.y = -10;
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+
+  window.addEventListener("resize", () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+</script> 
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    const konichiwaAudio = document.getElementById("konichiwaAudio");    
+    const welcome = document.getElementById("welcomeScreen");
+    const minigame = document.getElementById("minigame")
+
+    // Unmute trước khi phát
+    konichiwaAudio.muted = false;
+
+    // Cố gắng phát âm thanh khi load
+    const playPromise = konichiwaAudio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("Âm thanh phát thành công.");
+        })
+        .catch((error) => {
+          console.log("Tự động phát bị chặn, chờ người dùng click.");
+        });
+    }
+      
+    minigame.style.display = "none"; 
+
+    setTimeout(() => {
+        welcome.style.opacity = 0;
+        setTimeout(() => {
+          welcome.style.display = "none";
+          minigame.style.display = "block";
+          setTimeout(() => {
+            minigame.style.opacity = 1; // làm cho minigame dần hiện ra
+          }, 100); // Thời gian delay trước khi minigame hiện ra
+        }, 1000); // Sau 1 giây, ẩn màn chào
+      }, 2000); // Sau 3 giây, bắt đầu ẩn màn chào
+    });
+  </script>
+
+</body>
+</html>
